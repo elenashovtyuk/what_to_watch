@@ -1,20 +1,20 @@
+import csv
 from datetime import datetime
-
 # импортируем функцию выбора случайного значения
 from random import randrange
 
+import click
 # из модуля flask импортируем класс Flask
 # также импортируем функцию render_template
-from flask import abort, Flask, redirect, render_template, url_for, flash
-# новые импорты для создания форм
-from flask_wtf import FlaskForm
+from flask import Flask, abort, flash, redirect, render_template, url_for
 # новый импорт для создания и применения миграций
 from flask_migrate import Migrate
-from wtforms import StringField, SubmitField, TextAreaField, URLField
-from wtforms.validators import DataRequired, Length, Optional
-
 # из модуля (расширение для flask) импортируем нужный класс
 from flask_sqlalchemy import SQLAlchemy
+# новые импорты для создания форм
+from flask_wtf import FlaskForm
+from wtforms import StringField, SubmitField, TextAreaField, URLField
+from wtforms.validators import DataRequired, Length, Optional
 
 # создаем экземпляр класса Flask - объект приложения Flask
 app = Flask(__name__)
@@ -85,6 +85,32 @@ class OpinionForm(FlaskForm):
     )
 
     submit = SubmitField('Добавить')
+
+
+# добавим новую функцию обернутую в декоратор @app.cli.command
+# для создания новой пользовательской консольной команды
+# первым параметром передаем строку - имя команды
+@app.cli.command('load_options')
+def load_options_command():
+    """Функция загрузки мнений в базу данных."""
+    # открывается файл
+    with open('opinions.csv', encoding='utf-8') as f:
+        # создается итерируемый объект, который отображает каждую строку
+        # в качестве словаря с ключами из шапки файла
+        reader = csv.DictReader(f)
+        # для подсчета строк добавляется счетчик
+        counter = 0
+        for row in reader:
+            # распакованный словарь можно использовать
+            # для создания объекта мнения
+            opinion = Opinion(**row)
+            # изменения нужно зафиксировать
+            db.session.add(opinion)
+            db.session.commit()
+            counter += 1
+    click.echo(f'Загружено мнений: {counter}')
+
+
 
 
 # после класса формы добавим новую функцию, которая будет обрабатывать

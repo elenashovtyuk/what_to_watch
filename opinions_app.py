@@ -5,9 +5,11 @@ from random import randrange
 
 # из модуля flask импортируем класс Flask
 # также импортируем функцию render_template
-from flask import Flask, redirect, render_template, url_for, flash
+from flask import abort, Flask, redirect, render_template, url_for, flash
 # новые импорты для создания форм
 from flask_wtf import FlaskForm
+# новый импорт для создания и применения миграций
+from flask_migrate import Migrate
 from wtforms import StringField, SubmitField, TextAreaField, URLField
 from wtforms.validators import DataRequired, Length, Optional
 
@@ -32,6 +34,8 @@ app.config['SECRET_KEY'] = 'MY SECRET KEY FOR FORM'
 # создаем экземпляр класса SQLAlchemy и в него передается
 # в кач-ве параметра экземпляр приложения Flask
 db = SQLAlchemy(app)
+# создаем экземпляр класса Migrate
+migrate = Migrate(app, db)
 
 
 # описание модели
@@ -41,6 +45,8 @@ class Opinion(db.Model):
     text = db.Column(db.Text, unique=True, nullable=False)
     source = db.Column(db.String(256))
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    # добавим новое поле
+    added_by = db.Column(db.String(64))
 
 
 # класс формы опишем сразу после модели Opinion
@@ -81,6 +87,23 @@ class OpinionForm(FlaskForm):
     submit = SubmitField('Добавить')
 
 
+# после класса формы добавим новую функцию, которая будет обрабатывать
+# исключение '404: страница не найдена'
+# для регистрации функции-обработчика используем декоратор
+# @app.errorhandler
+@app.errorhandler(404)
+def page_not_found(error):
+    # вкачестве ответа вернется собственный шаблон и код ошибки
+    return render_template('404.html'), 404
+
+
+# зарегистрируем еще один обработчик - функцию, которая будет
+# обрабатывать исключение "500: внутренняя ошибка сервера"
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template('500.html'), 500
+
+
 # функция с основной логикой обернутая в декоратор app.route,
 # который связывает функцию с указанным URL('/')
 # эта функция отвечает за отображение главной страницы
@@ -91,7 +114,8 @@ def index_view():
     # если мнений нет
     if not quantity:
         # то возвращается сообщение
-        return 'В базе данных сообщений нет.'
+        abort(404)
+        # return 'В базе данных сообщений нет.'
     # иначе выбирается случайное число в диапазоне от 0 до quantity
     offset_value = randrange(quantity)
     # и определяется случайный объект
